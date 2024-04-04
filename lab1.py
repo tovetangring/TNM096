@@ -11,9 +11,10 @@ PUZZLE_GOAL  = "012345678"
 MAX_ITERATIONS = 1000  # Set the maximum number of unique children
 
 class Node:
-  def __init__(self, h1, puzzle):
+  def __init__(self, h1, puzzle, parent):
     self.h1 = h1
     self.puzzle = puzzle
+    self.parent = parent
 
 class HashTable:
     # Create empty bucket list of given size
@@ -43,13 +44,13 @@ class HashTable:
                 found_key = True
                 break
  
-        # If the bucket has same key as the key to be inserted,
-        # Update the key value
-        # Otherwise append the new key-value pair to the bucket
-        if found_key:
-            print("Error: Key already exists")
-        else:
+        # If the bucket does not contain a similar key:
+        # Append the new key-value pair to the bucket
+        if not found_key:
             bucket.append((key, val))
+
+        # Return if the operation was successful
+        return not found_key
 
     # Remove a value with specific key
     def delete_val(self, key):
@@ -92,14 +93,18 @@ class HashTable:
 
 # Define a function that prints the puzzle in a readable format
 def printPuzzle(puzzleToPrint):
-  for i, row in enumerate(puzzleToPrint):
-    for j, value in enumerate(row):
-      if value == 0:
-        print("[" + ' ' +  "]", end=" ")
-      else:
-        print([value], end=" ")
+    for i, tile in enumerate(puzzleToPrint):
+        if i % 3 == 0:
+            print()
+        if tile == "0":
+            print("[" + ' ' +  "]", end=" ")
+        else:
+          print("[" + tile +  "]", end=" ")
     print()
-  print("-----------")
+    print("-----------")
+
+def replaceChar(s, i, ch):
+  return s[:i] + ch + s[i + 1:]
 
 # Define a function the finds the 0 in the puzzle
 def findZero(puzzleToFind):
@@ -117,49 +122,45 @@ def shift(direction, puzzleToChange):
   print(type(coord))
   shiftedPuzzle = puzzleToChange
   if coord == None:
-    print("ERROR: No empty tile found")
+    print("ERROR:1 No empty tile found")
     return None
   
   match direction:
     case "up":
       if coord < 3:
-        print("ERROR: Cannot shift up")
         return None
       
       shiftedTile = puzzleToChange[coord - 3]
-      shiftedPuzzle[coord - 3] = "0"
+      shiftedPuzzle = replaceChar(shiftedPuzzle, coord-3, "0")
   
     case "down":
       if coord > 5:
-        print("ERROR: Cannot shift down")
         return None
       
-      shiftedTile = puzzleToChange[coord[0] + 3]
-      shiftedPuzzle[coord[0] + 3] = "0"
+      shiftedTile = puzzleToChange[coord + 3]
+      shiftedPuzzle = replaceChar(shiftedPuzzle, coord + 3, "0")
     
     case "left":
       if coord % 3 == 0:
-        print("ERROR: Cannot shift left")
         return None
       
-      shiftedTile = puzzleToChange[coord[0] - 1]
-      shiftedPuzzle[coord[0] - 1] = "0"
+      shiftedTile = puzzleToChange[coord - 1]
+      shiftedPuzzle = replaceChar(shiftedPuzzle, coord - 1, "0")
   
     case "right":
       if coord % 3 == 2:
-        print("ERROR: Cannot shift right")
         return None
       
-      shiftedTile = puzzleToChange[coord[0] + 1]
-      shiftedPuzzle[coord[0] + 1] = "0"
+      shiftedTile = puzzleToChange[coord + 1]
+      shiftedPuzzle = replaceChar(shiftedPuzzle, coord + 1, "0")
 
     case _:
-      print("ERROR: Invalid direction")
+      print("ERROR:2 Invalid direction")
       return None
      
-  shiftedPuzzle[coord] = shiftedTile
+  shiftedPuzzle = replaceChar(shiftedPuzzle, coord, shiftedTile)
   printPuzzle(shiftedPuzzle)
-  return Node(calculateH1(shiftedPuzzle), shiftedPuzzle)
+  return Node(calculateH1(shiftedPuzzle), shiftedPuzzle, None)
 
 
 # endregion
@@ -175,57 +176,46 @@ def calculateH1(puzzleToCheck):
       h1 += 1
   return h1
 
-def generateChildren(activeNode):
+def generateChildren(activeNode, visited):
   directions = ["up", "down", "left", "right"]
+  children = []
 
+  # Generate possible moves from the current node
   for dir in directions:
     childNode = shift(dir, activeNode.puzzle)
+    childNode.parent = activeNode
     if childNode != None:
-      activeNode.children.append(childNode) # Byt?
+      puzzle = childNode.puzzle
+      # Check if the child has already been visited,
+      # if not, add it to the list of children
+      if visited.set_val(puzzle, calculateH1(puzzle)):
+        children.append(childNode)
+
+  return children
 
  ###
-def aStarSearch(startNode, puzzle):
-  #Make aldready checked list
+def aStarSearch(startNode):
+  #Make already checked list
+  visited = HashTable()
+  visited.set_val(startNode.puzzle, startNode.h1)
+
   #Make priority queue
   q = PriorityQueue()
-  children = generateChildren(startNode)
-  q.put((calculateH1(puzzle), startNode))
+  q.put(startNode.h1, startNode)
 
+  tries = 0
+  while tries < MAX_ITERATIONS and not q.empty():
   #Find children for first position in priority queue
+    activeNode = q.get()
+    if activeNode.puzzle == PUZZLE_GOAL:
+      return
+    
+    children = generateChildren(activeNode, visited)
+    for node in children:
+      q.put(node.h1, node)
 
-  #Check if the solution is any of the children
+    tries += 1
   
-  #Place children in priority queue (and it will automatically sort them) and remove parent
-  pass
-  
-visited = HashTable()
-print(visited)
-visited.set_val(PUZZLE_START, 0)
-print(visited)
-print()
-visited.set_val(PUZZLE_GOAL, 9)
-print(visited)
-print()
-visited.set_val(PUZZLE_START, 0)
-print(visited)
-print()
-visited.delete_val(PUZZLE_START)
-print(visited)
-print()
-visited.delete_val(PUZZLE_START)
-print(visited)
 
-# Try the shift functions
-printPuzzle(PUZZLE_START)
-shift("up", PUZZLE_START)
-shift("down", PUZZLE_START)
-shift("left", PUZZLE_START)
-shift("right", PUZZLE_START)
-
-
-tries = 0
-solved = False
-startNode = Node(0, PUZZLE_START)
-# while not solved and tries < MAX_ITERATIONS:
-#   solved = aStarSearch(startNode)
-#   tries += 1
+startNode = Node(0, PUZZLE_START, None)
+aStarSearch(startNode)
