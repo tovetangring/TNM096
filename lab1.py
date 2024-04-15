@@ -241,7 +241,7 @@ def generate_tree(node):
 PUZZLE_START = "867254301"
 PUZZLE_GOAL  = "123456780"
 MAX_ITERATIONS = 1000000  # Set the maximum number of unique children
-USE_MANHATTAN = False
+USE_MANHATTAN = True
 
 #Make already checked list
 visited = HashTable()
