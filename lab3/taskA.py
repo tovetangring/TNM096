@@ -1,50 +1,240 @@
+import random
+
+class Clause:
+
+    def __init__(self, list1, list2 = None):
+        if list2 == None:
+            self.n = []
+            self.p = []
+            for i in list1:
+                if i > 0 and i not in self.p:
+                    self.p.append(i)
+                elif i < 0 and -i not in self.n:
+                    self.n.append(-i)
+        else:
+            self.n = list1
+            self.p = list2
+    
+    def __bool__(self):
+        for i in self.n:
+            if i in self.p:
+                return True
+        return False
+    
+    def remove_duplicates(self):
+        self.n = list(set(self.n))
+        self.p = list(set(self.p))
+
+    # Operator &, used for union
+    def __and__(self, other):
+        return Clause(self.n + other.n, self.p + other.p)
+
+    # Operator -=
+    def __isub__(self, other):
+        if -other in self.n and other < 0:
+            self.n.remove(-other)
+        if other in self.p and other > 0:
+            self.p.remove(other)
+        return self
+    
+    # Operator <=
+    def __le__(self, other):
+        for i in self.n:
+            if i not in other.n:
+                return False
+        for i in self.p:
+            if i not in other.p:
+                return False
+        return True
+    
+    # Operator >=
+    def __ge__(self, other):
+        for i in other.n:
+            if i not in self.n:
+                return False
+        for i in other.p:
+            if i not in self.p:
+                return False
+        return True
+    
+    # Operator <
+    def __lt__(self, other):
+        return self <= other and self != other
+    
+    # Operator >
+    def __gt__(self, other):
+        return self >= other and self != other
+        
+    # Operator ==
+    def __eq__(self, other):
+        # Create sorted copies of the lists
+        n1 = sorted(self.n)
+        p1 = sorted(self.p)
+        p2 = sorted(other.p)
+        n2 = sorted(other.n)
+        # Check if the lists are the same
+        return n1 == n2 and p1 == p2
+    
+    def is_empty(self):
+        return not self.n and not self.p
+    
+    def __str__(self):
+        return f"{self.n}, {self.p}"
+    
+    def print_converter(self):
+        def get_word(n):
+            switcher = {
+                1: "sun",
+                2: "money",
+                3: "ice",
+                4: "movie",
+                5: "cry"
+            }
+            return switcher.get(n, "Invalid number")
+
+        output = ""
+        for i in self.n:
+            output += f"-{get_word(i)} "
+        for i in self.p:
+            output += f"{get_word(i)} "
+        # Remove last space
+        output = output[:-1]
+        # Add ∨ between each word
+        output = output.replace(" ", " ∨ ")
+        print(output)
+    
+
+def intersect(a, b):
+    return [i for i in a if i in b]
+
 # TASK A.1: Given two clauses, returns their resolvent.
-def task1(c1, c2):
-    resolvent = []
+def task1(A: Clause, B : Clause):
+    # region A.p ∩ B.n = {} and A.n ∩ B.p = {}
+    ApBn = intersect(A.p, B.n)
+    AnBp = intersect(A.n, B.p)
+         
+    if not ApBn and not AnBp:
+        return False
+    # endregion
 
-    for literal in c1:
-        if literal not in c2 and -literal not in c2:
-            resolvent.append(literal)
+   # region (A.p ∩ B.n) ̸= {}
+    if ApBn:
+        a = random.choice(ApBn)
+        A -= a
+        B -= -a
+    elif AnBp:
+        a = random.choice(AnBp)
+        A -= -a
+        B -= a
+   # endregion
+        
+    #C.p ← A.p ∪ B.p
+    #C.n ← A.n ∪ B.n
+    C = A & B
 
-    for literal in c2:
-        if literal not in c1 and -literal not in c1:
-            resolvent.append(literal)
+    # Check if C is a tautology
+    if C:
+        print("Tautology found")
+        return False
 
-    return resolvent
+    C.remove_duplicates() # SKRIV FUNKTION FÖR DENNA
+    
+    return C
 
-# TASK A.2: Applies resolution mechanism to a given set of clauses.
 def task2(clauses):
-    new_clauses = list(clauses)
+    def Incorporate(S, KB):
+        for A in S:
+            KB = Incorporate_clause(A, KB)
+        return KB
+    
+    def Incorporate_clause(A, KB):
+        for B in KB:
+            if A <= B:
+                return KB
+        for B in KB:
+            if A <= B:
+                KB.remove(B)
+        KB.append(A)
+        return KB
 
     while True:
-        new_resolvents = []
-
-        for i in range(len(new_clauses)):
-            for j in range(i+1, len(new_clauses)):
-                resolvent = task1(new_clauses[i], new_clauses[j])
-                if not resolvent:
-                    return True  # Empty clause found, contradiction
-                if resolvent not in new_clauses and resolvent not in new_resolvents:
-                    new_resolvents.append(resolvent)
-
-        if not new_resolvents:
-            return False  # No new resolvent can be derived
-
-        new_clauses += new_resolvents
+        print("New iteration")
+        S = []
+        #KB′ ← KB
+        KB = clauses.copy()
+        for A in KB:
+            for B in KB:
+                if A != B:
+                    C = task1(A, B)
+                    if C:
+                        S.append(C)
+        if not S:
+            print("not S")
+            return KB
+        
+        KB = Incorporate(S, KB)
+        if KB == clauses:
+            print("No new clauses were added")
+            break
 
 
 # Test
-if __name__ == "__main__":
+def test1():
     # Test for task 1:
-    c1 = [1, 4, 8]
-    c2 = [1, 5, 6, 8]
-
+    A, B, C, D, G, T, Z, F = 1, 3, 4, 7, 9, 16, 25, 29
+    # Resolution
+    print("Resolution")
+    # Ex 1
+    c1 = Clause([A, B, -C])
+    c2 = Clause([C, B])
     print(task1(c1,c2))
 
-    # Test för task 2:
-    clauses = [[1, 2, -3], [-1, 3], [-2, 3], [-3]]
+    # Ex 2
+    c1 = Clause([A, B, -C])
+    c2 = Clause([D, B, -G])
+    print(task1(c1,c2))
 
-    if task2(clauses):
-        print("The formula is unsatisfiable because a contradiction was found.")
-    else:
-        print("The formula is satisfiable because no contradiction was found.")
+    # Ex 3
+    c1 = Clause([-B, C, T])
+    c2 = Clause([-C, Z, B])
+    print(task1(c1,c2))
+
+    # Subsumption
+    print("Subsumption")
+    print(Clause([A, C]) < Clause([A, B, C]))
+    print(Clause([B, -C]) < Clause([A, B, -C]))
+    print(Clause([B, -F, -C]) < Clause([A, B, -C]))
+    print(Clause([B]) < Clause([A, B, -C]))
+    print(Clause([B, -C, A]) < Clause([A, B, -C]))
+
+def test2():
+    SUN, MONEY, ICE, MOVIE, CRY = 1, 2, 3, 4, 5
+
+    # 1 & 2. Define the clauses for Bob
+    # region Clauses
+    # ¬sun ∨ ¬money ∨ ice
+    # ¬money ∨ ice ∨ movie
+    # ¬movie ∨ money
+    # ¬movie ∨ ¬ice
+    # sun ∨ money ∨ cry
+    # endregion
+    clauses = [
+        Clause([-SUN, -MONEY, ICE]),
+        Clause([-MONEY, ICE, MOVIE]),
+        Clause([-MOVIE, MONEY]),
+        Clause([-MOVIE, -ICE]),
+        Clause([SUN, MONEY, CRY])
+    ]
+
+    for clause in clauses:
+        clause.print_converter()
+    print("===================")
+
+    # 3. Run the solver
+    KB = task2(clauses)
+
+    for clause in KB:
+        clause.print_converter()
+
+# test1()
+test2()
