@@ -1,19 +1,28 @@
 # import random
-from queue import PriorityQueue 
-
-h1 = 0 # Hur många är på rätt ställe
-h2 = 0 # Manhattan avstånd till rätt ställe 
-
-# Define the puzzle and its goal state (empty is represented by 0)
-PUZZLE_START = "532416078"
-PUZZLE_GOAL  = "012345678"
-
-MAX_ITERATIONS = 1000  # Set the maximum number of unique children
+from queue import PriorityQueue
+import datetime
 
 class Node:
-  def __init__(self, h1, puzzle):
-    self.h1 = h1
+  def __init__(self, puzzle, parent):
+    if USE_MANHATTAN:
+      self.h1 = -(calculate_manhattan(puzzle) - 9)
+    else:
+      self.h1 = -(calculate_h1(puzzle) - 9)
     self.puzzle = puzzle
+    self.parent = parent
+    self.depth = 0
+    self.cost = self.h1 + self.depth
+
+  def calculate_cost(self):
+    self.cost = self.h1 + self.depth
+
+  # To compare nodes
+  def __lt__(self, other):
+    return self.cost < other.cost
+  
+  # To print the node
+  def __str__(self):
+    return "Puzzle: " + self.puzzle + " H1: " + str(-(self.h1-9)) + "(" + str(self.h1) + ")"
 
 class HashTable:
     # Create empty bucket list of given size
@@ -43,39 +52,13 @@ class HashTable:
                 found_key = True
                 break
  
-        # If the bucket has same key as the key to be inserted,
-        # Update the key value
-        # Otherwise append the new key-value pair to the bucket
-        if found_key:
-            print("Error: Key already exists")
-        else:
+        # If the bucket does not contain a similar key:
+        # Append the new key-value pair to the bucket
+        if not found_key:
             bucket.append((key, val))
 
-    # Remove a value with specific key
-    def delete_val(self, key):
-       
-        # Get the index from the key using
-        # hash function
-        hashed_key = hash(key) % self.size
-
-        # Get the bucket corresponding to index
-        bucket = self.hash_table[hashed_key]
-         
-        found_key = False
-        for index, record in enumerate(bucket):
-            record_key, record_val = record
-             
-            # check if the bucket has same key as
-            # the key to be inserted
-            if record_key == key:
-                found_key = True
-                break
- 
-        # If the bucket has same key as the key to be inserted,
-        # Update the key value
-        # Otherwise append the new key-value pair to the bucket
-        if found_key: bucket.pop(index)
-        return
+        # Return if the operation was successful
+        return not found_key
     
     # To print the items of hash map
     def __str__(self):
@@ -91,19 +74,22 @@ class HashTable:
 # puzzle = to_2d_list(flattened_puzzle, len(puzzle[0]))
 
 # Define a function that prints the puzzle in a readable format
-def printPuzzle(puzzleToPrint):
-  for i, row in enumerate(puzzleToPrint):
-    for j, value in enumerate(row):
-      if value == 0:
-        print("[" + ' ' +  "]", end=" ")
-      else:
-        print([value], end=" ")
+def print_puzzle(puzzle_to_print):
+    for i, tile in enumerate(puzzle_to_print):
+        if i % 3 == 0:
+            print()
+        if tile == "0":
+            print("[" + ' ' +  "]", end=" ")
+        else:
+          print("[" + tile +  "]", end=" ")
     print()
-  print("-----------")
+
+def replace_char(s, i, ch):
+  return s[:i] + ch + s[i + 1:]
 
 # Define a function the finds the 0 in the puzzle
-def findZero(puzzleToFind):
-  for index, tile in enumerate(puzzleToFind):
+def find_zero(puzzle_to_find):
+  for index, tile in enumerate(puzzle_to_find):
     if "0" in tile:
       return index
 
@@ -112,120 +98,163 @@ def findZero(puzzleToFind):
 # region Shift functions
 
 # Define a function that shifts the puzzle in a given direction. Returns a node
-def shift(direction, puzzleToChange):
-  coord = findZero(puzzleToChange)
-  print(type(coord))
-  shiftedPuzzle = puzzleToChange
+def shift(direction, puzzle_to_change):
+  coord = find_zero(puzzle_to_change)
+  shifted_puzzle = puzzle_to_change
   if coord == None:
-    print("ERROR: No empty tile found")
+    print("ERROR:1 No empty tile found")
     return None
   
   match direction:
     case "up":
       if coord < 3:
-        print("ERROR: Cannot shift up")
         return None
       
-      shiftedTile = puzzleToChange[coord - 3]
-      shiftedPuzzle[coord - 3] = "0"
+      shifted_tile = puzzle_to_change[coord - 3]
+      shifted_puzzle = replace_char(shifted_puzzle, coord-3, "0")
   
     case "down":
       if coord > 5:
-        print("ERROR: Cannot shift down")
         return None
       
-      shiftedTile = puzzleToChange[coord[0] + 3]
-      shiftedPuzzle[coord[0] + 3] = "0"
+      shifted_tile = puzzle_to_change[coord + 3]
+      shifted_puzzle = replace_char(shifted_puzzle, coord + 3, "0")
     
     case "left":
       if coord % 3 == 0:
-        print("ERROR: Cannot shift left")
         return None
       
-      shiftedTile = puzzleToChange[coord[0] - 1]
-      shiftedPuzzle[coord[0] - 1] = "0"
+      shifted_tile = puzzle_to_change[coord - 1]
+      shifted_puzzle = replace_char(shifted_puzzle, coord - 1, "0")
   
     case "right":
       if coord % 3 == 2:
-        print("ERROR: Cannot shift right")
         return None
       
-      shiftedTile = puzzleToChange[coord[0] + 1]
-      shiftedPuzzle[coord[0] + 1] = "0"
+      shifted_tile = puzzle_to_change[coord + 1]
+      shifted_puzzle = replace_char(shifted_puzzle, coord + 1, "0")
 
     case _:
-      print("ERROR: Invalid direction")
+      print("ERROR:2 Invalid direction")
       return None
      
-  shiftedPuzzle[coord] = shiftedTile
-  printPuzzle(shiftedPuzzle)
-  return Node(calculateH1(shiftedPuzzle), shiftedPuzzle)
+  shifted_puzzle = replace_char(shifted_puzzle, coord, shifted_tile)
+  return Node(shifted_puzzle, None)
 
 
 # endregion
-
-#####################     A* SEARCH      ############################
   
 #Update h1
-def calculateH1(puzzleToCheck):
+def calculate_h1(puzzle_to_check):
   h1 = 0
   # Go through the puzzle and check how many tiles are on the correct position
-  for tile in puzzleToCheck:
-    if tile == PUZZLE_GOAL:
+  for i, tile in enumerate(puzzle_to_check):
+    if tile == PUZZLE_GOAL[i]:
       h1 += 1
   return h1
 
-def generateChildren(activeNode):
+# Calculate Manhattan distance
+def calculate_manhattan(puzzle_to_check):
+  # Turn the puzzle into a 2D list 
+  positions = [[1,1], [2,1], [3,1], [1,2], [2,2], [3,2], [1,3], [2,3], [3,3]]
+  h = 0
+  # Go through the puzzle and calculate the Manhattan distance for each tile
+  for n in puzzle_to_check:
+    # Get the index of the current tile in the 2D grid
+    index_of_current = puzzle_to_check.index(n)
+    state_pos = positions[index_of_current]
+
+    # Get the goal position of the current tile
+    if n == "0":
+      goal_pos = positions[8]
+    else:
+      goal_pos = positions[int(n)-1]
+    
+    # Calculate the Manhattan distance
+    y_dist = abs(state_pos[1] - goal_pos[1])
+    x_dist = abs(state_pos[0] - goal_pos[0])
+    h = h + y_dist + x_dist
+  return h
+
+def generate_children(active_node, visited):
   directions = ["up", "down", "left", "right"]
+  children = []
 
+  # Generate possible moves from the current node
   for dir in directions:
-    childNode = shift(dir, activeNode.puzzle)
-    if childNode != None:
-      activeNode.children.append(childNode) # Byt?
+    child_node = shift(dir, active_node.puzzle)
+    if child_node != None:
+      child_node.parent = active_node
+      child_node.depth = active_node.depth + 1
+      child_node.calculate_cost()
+      puzzle = child_node.puzzle
+      # Check if the child has already been visited,
+      # if not, add it to the list of children
+      if visited.set_val(puzzle, calculate_h1(puzzle)):
+        children.append(child_node)
+       
+  return children
 
- ###
-def aStarSearch(startNode, puzzle):
-  #Make aldready checked list
+def a_star_search(start_node, visited):
+
+  print("Starting A* search")
+  print("Start node", start_node)
+  print_puzzle(start_node.puzzle)
+
+  visited.set_val(start_node.puzzle, start_node.h1)
+
   #Make priority queue
   q = PriorityQueue()
-  children = generateChildren(startNode)
-  q.put((calculateH1(puzzle), startNode))
+  q.put(start_node)
 
+  tries = 0
+  while tries < MAX_ITERATIONS and not q.empty():
   #Find children for first position in priority queue
+    active_node = q.get()
 
-  #Check if the solution is any of the children
+    if active_node.puzzle == PUZZLE_GOAL:
+      print("Solution found!")
+      return active_node
   
-  #Place children in priority queue (and it will automatically sort them) and remove parent
-  pass
+    children = generate_children(active_node, visited)
+    for node in children:
+      q.put(node)
+
+    tries += 1
+
+    # Progress bar
+    if tries % 10000 == 0:
+      print("Tries:", tries, "Queue size:", q.qsize())
+  print()
+  print("No solution found")
+
+# Generate an array with all the nodes in the tree
+def generate_tree(node):
+  tree = []
+  while node != None:
+    tree.append(node)
+    node = node.parent
+  return tree[::-1] 
   
+
+# Define the puzzle and its goal state (empty is represented by 0)
+PUZZLE_START = "867254301"
+PUZZLE_GOAL  = "123456780"
+MAX_ITERATIONS = 1000000  # Set the maximum number of unique children
+USE_MANHATTAN = False
+
+#Make already checked list
 visited = HashTable()
-print(visited)
-visited.set_val(PUZZLE_START, 0)
-print(visited)
-print()
-visited.set_val(PUZZLE_GOAL, 9)
-print(visited)
-print()
-visited.set_val(PUZZLE_START, 0)
-print(visited)
-print()
-visited.delete_val(PUZZLE_START)
-print(visited)
-print()
-visited.delete_val(PUZZLE_START)
-print(visited)
 
-# Try the shift functions
-printPuzzle(PUZZLE_START)
-shift("up", PUZZLE_START)
-shift("down", PUZZLE_START)
-shift("left", PUZZLE_START)
-shift("right", PUZZLE_START)
+startTime = datetime.datetime.now()
+startNode = Node(PUZZLE_START, None)
+endNode = a_star_search(startNode, visited)
+endTime = datetime.datetime.now()
 
+tree = generate_tree(endNode)
+for node in tree:
+  print_puzzle(node.puzzle)
 
-tries = 0
-solved = False
-startNode = Node(0, PUZZLE_START)
-# while not solved and tries < MAX_ITERATIONS:
-#   solved = aStarSearch(startNode)
-#   tries += 1
+print()
+print("Depth:", len(tree) - 1)
+print("Time:", (endTime - startTime).total_seconds() * 1000, "ms")
