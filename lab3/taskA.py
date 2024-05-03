@@ -108,7 +108,7 @@ def intersect(a, b):
     return [i for i in a if i in b]
 
 # TASK A.1: Given two clauses, returns their resolvent.
-def task1(A: Clause, B : Clause):
+def resolution(A: Clause, B : Clause):
     # region A.p ∩ B.n = {} and A.n ∩ B.p = {}
     ApBn = intersect(A.p, B.n)
     AnBp = intersect(A.n, B.p)
@@ -117,7 +117,7 @@ def task1(A: Clause, B : Clause):
         return False
     # endregion
 
-   # region (A.p ∩ B.n) ̸= {}
+    # region (A.p ∩ B.n) ̸= {}
     if ApBn:
         a = random.choice(ApBn)
         A -= a
@@ -126,7 +126,7 @@ def task1(A: Clause, B : Clause):
         a = random.choice(AnBp)
         A -= -a
         B -= a
-   # endregion
+    # endregion
         
     #C.p ← A.p ∪ B.p
     #C.n ← A.n ∪ B.n
@@ -137,45 +137,53 @@ def task1(A: Clause, B : Clause):
         print("Tautology found")
         return False
 
-    C.remove_duplicates() # SKRIV FUNKTION FÖR DENNA
+    C.remove_duplicates()
     
     return C
 
-def task2(clauses):
-    def Incorporate(S, KB):
-        for A in S:
-            KB = Incorporate_clause(A, KB)
-        return KB
-    
-    def Incorporate_clause(A, KB):
-        for B in KB:
-            if A <= B:
-                return KB
-        for B in KB:
-            if A <= B:
-                KB.remove(B)
-        KB.append(A)
-        return KB
+def incorporate(S, kb):
+    for A in S:
+        kb = incorporate_clause(A, kb)
+    return kb
 
+def incorporate_clause(A, kb):
+    for B in kb:
+        if A <= B:
+            return kb
+    for B in kb:
+        if A <= B:
+            kb.remove(B)
+    kb.append(A)
+    return kb
+
+def find_resolvents(kb):
+    resolvents = []
+    for A in kb:
+        for B in kb:
+            C = resolution(A, B)
+            if C:
+                resolvents.append(C)
+    return resolvents
+
+# TASK A.2: Given a knowledge base, returns a new knowledge base after applying the resolution rule.
+def solver(kb):
+    print("New iteration")
+    kb = incorporate(kb, []) 
     while True:
-        print("New iteration")
-        S = []
-        #KB′ ← KB
-        KB = clauses.copy()
-        for A in KB:
-            for B in KB:
-                if A != B:
-                    C = task1(A, B)
-                    if C:
-                        S.append(C)
-        if not S:
+        s = []
+        kb_deriv = kb.copy()
+        s = find_resolvents(kb)
+
+        if not s:
             print("not S")
-            return KB
+            return kb
         
-        KB = Incorporate(S, KB)
-        if KB == clauses:
+        kb = incorporate(s, kb)
+
+        if kb == kb_deriv:
             print("No new clauses were added")
             break
+
 
 
 # Test
@@ -187,17 +195,17 @@ def test1():
     # Ex 1
     c1 = Clause([A, B, -C])
     c2 = Clause([C, B])
-    print(task1(c1,c2))
+    print(resolution(c1,c2))
 
     # Ex 2
     c1 = Clause([A, B, -C])
     c2 = Clause([D, B, -G])
-    print(task1(c1,c2))
+    print(resolution(c1,c2))
 
     # Ex 3
     c1 = Clause([-B, C, T])
     c2 = Clause([-C, Z, B])
-    print(task1(c1,c2))
+    print(resolution(c1,c2))
 
     # Subsumption
     print("Subsumption")
@@ -231,7 +239,7 @@ def test2():
     print("===================")
 
     # 3. Run the solver
-    KB = task2(clauses)
+    KB = solver(clauses)
 
     for clause in KB:
         clause.print_converter()
