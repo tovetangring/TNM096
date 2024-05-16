@@ -95,7 +95,7 @@ class Clause:
 
         output = ""
         for i in self.n:
-            output += f"-{get_word(i)} "
+            output += f"¬{get_word(i)} "
         for i in self.p:
             output += f"{get_word(i)} "
         # Remove last space
