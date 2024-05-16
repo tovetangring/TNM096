@@ -1,3 +1,4 @@
+import copy
 import random
 
 class Clause:
@@ -109,9 +110,16 @@ def intersect(a, b):
 
 # TASK A.1: Given two clauses, returns their resolvent.
 def resolution(A: Clause, B : Clause):
+    A_copy = copy.deepcopy(A)
+    B_copy = copy.deepcopy(B)
+
     # region A.p ∩ B.n = {} and A.n ∩ B.p = {}
-    ApBn = intersect(A.p, B.n)
-    AnBp = intersect(A.n, B.p)
+    ApBn = intersect(A_copy.p, B_copy.n)
+    AnBp = intersect(A_copy.n, B_copy.p)
+    # print(f"A = {A}")
+    # print(f"B = {B}")
+    # print(f"A.p ∩ B.n = {ApBn} and A.n ∩ B.p = {AnBp}")
+    # print("---")
          
     if not ApBn and not AnBp:
         return False
@@ -120,69 +128,65 @@ def resolution(A: Clause, B : Clause):
     # region (A.p ∩ B.n) ̸= {}
     if ApBn:
         a = random.choice(ApBn)
-        A -= a
-        B -= -a
+        A_copy -= a
+        B_copy -= -a
     elif AnBp:
         a = random.choice(AnBp)
-        A -= -a
-        B -= a
+        A_copy -= -a
+        B_copy -= a
     # endregion
-        
+
     #C.p ← A.p ∪ B.p
     #C.n ← A.n ∪ B.n
-    C = A & B
+    C = A_copy & B_copy
 
     # Check if C is a tautology
     if C:
-        print("Tautology found")
         return False
 
-    C.remove_duplicates()
+    # C.remove_duplicates()
     
     return C
 
 def incorporate(S, kb):
-    for A in S:
+    for A in copy.deepcopy(S):
         kb = incorporate_clause(A, kb)
     return kb
 
 def incorporate_clause(A, kb):
-    for B in kb:
-        if A <= B:
+    for B in copy.deepcopy(kb):
+        if B <= A:
             return kb
-    for B in kb:
+    for B in copy.deepcopy(kb):
         if A <= B:
             kb.remove(B)
     kb.append(A)
     return kb
 
-def find_resolvents(kb):
-    resolvents = []
-    for A in kb:
-        for B in kb:
-            C = resolution(A, B)
-            if C:
-                resolvents.append(C)
-    return resolvents
-
 # TASK A.2: Given a knowledge base, returns a new knowledge base after applying the resolution rule.
 def solver(kb):
-    print("New iteration")
-    kb = incorporate(kb, []) 
+    kb = incorporate(kb, [])
     while True:
         s = []
-        kb_deriv = kb.copy()
-        s = find_resolvents(kb)
+        kb_deriv = copy.deepcopy(kb)
+
+        for A in kb:
+            for B in kb[kb.index(A)+1:]:
+                C = resolution(A, B)
+                if type(C) is not bool:
+                    s.append(C)
+
+        for clause in s:
+            clause.print_converter()
 
         if not s:
-            print("not S")
             return kb
         
         kb = incorporate(s, kb)
 
         if kb == kb_deriv:
-            print("No new clauses were added")
             break
+    return kb
 
 
 
@@ -231,18 +235,18 @@ def test2():
         Clause([-MONEY, ICE, MOVIE]),
         Clause([-MOVIE, MONEY]),
         Clause([-MOVIE, -ICE]),
+        Clause([MOVIE]),
         Clause([SUN, MONEY, CRY])
     ]
-
-    for clause in clauses:
-        clause.print_converter()
-    print("===================")
 
     # 3. Run the solver
     KB = solver(clauses)
 
+    # Find out the type of KB
+    print("==== RESULT ====")
     for clause in KB:
         clause.print_converter()
+
 
 # test1()
 test2()
